@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.7.34221.43
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CrmApiTelegramBot", "CrmApiTelegramBot\CrmApiTelegramBot.csproj", "{086A3DC0-AF2F-487F-9024-DF718F33FCC9}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{086A3DC0-AF2F-487F-9024-DF718F33FCC9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{086A3DC0-AF2F-487F-9024-DF718F33FCC9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{086A3DC0-AF2F-487F-9024-DF718F33FCC9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{086A3DC0-AF2F-487F-9024-DF718F33FCC9}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {68C6C103-9CFC-44A0-9317-1A629FE8672E}
+	EndGlobalSection
+EndGlobal
