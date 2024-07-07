@@ -1,7 +1,9 @@
-﻿using CrmApiTelegramBot.BotLogic.Interfaces;
+﻿
 using CrmApiTelegramBot.Model;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using System.Net;
+using System.Net.Http;
 using System.Text.Json;
 using System.Threading.Channels;
 using Telegram.Bot;
@@ -12,25 +14,26 @@ using Telegram.Bot.Types.ReplyMarkups;
 
 namespace CrmApiTelegramBot.BotLogic.Classes
 {
-    public class StartBot : IStartBot
+    public class StartBot
     {
-        private readonly CancellationTokenSource cts = new CancellationTokenSource();
+        private static readonly CancellationTokenSource cts = new CancellationTokenSource();
         private static ITelegramBotClient botClient;
-        private IHttpClientFactory _httpClientFactory;
-        static ILogger logger = Program.logFactory.CreateLogger<StartBot>();
-        IConfiguration _config { get; }
+        private static IHttpClientFactory _httpClientFactory;
+        //private static IConfiguration _configuration;
+        //private static ILoggerFactory _loggerFactory { get; set; }
+        private static ILogger _logger;
 
-        public StartBot(IConfiguration configuration) => _config = configuration;
-
-        public StartBot(IHttpClientFactory httpClientFactory)
+        public StartBot(IHttpClientFactory httpClientFactory, ILogger<StartBot> logger)
         {
             _httpClientFactory = httpClientFactory;
+            _logger = logger ;
         }
 
 
-        async void IStartBot.StartBot()
+        public static async void startBot(IConfiguration config)
         {
-            var token = ReadApiToken(_config);
+            //ILogger logger = _loggerFactory.CreateLogger("StartBot");
+            var token = ReadApiToken(config);
             botClient = new TelegramBotClient(token);
             var cancelationToken = cts.Token;
             var reciveOpt = new ReceiverOptions()
@@ -38,13 +41,12 @@ namespace CrmApiTelegramBot.BotLogic.Classes
                 AllowedUpdates = Array.Empty<UpdateType>(),
                 ThrowPendingUpdates = true 
             };
-
             var bot = await botClient.GetMeAsync(cancelationToken);
-            logger.LogInformation("Start receiving updates for {BotName}", bot.Username ?? "Integration Trip Bot");
+            //_logger.LogInformation("Start receiving updates for {BotName}", bot.Username ?? "Integration Trip Bot");
             await botClient.ReceiveAsync(HandleUpdateAsync, HandleErrorAsync, reciveOpt, cancelationToken);
         }
 
-        public async Task SendMessage(ITelegramBotClient client, Chat chat, string message, ParseMode parseMode = ParseMode.Html)
+        public static async Task SendMessage(ITelegramBotClient client, Chat chat, string message, ParseMode parseMode = ParseMode.Html)
         {
             try
             {
@@ -60,12 +62,12 @@ namespace CrmApiTelegramBot.BotLogic.Classes
             }
         }
 
-        private async Task HandleUnknownAsync(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)
+        private static async Task HandleUnknownAsync(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)
         {
             //await SendMessage($"Telegram UpdateType \"{update.Type.ToString()}\" not handled", ParseMode.Html, cancellationToken);
         }
 
-        public async Task HandleMessageAsync(ITelegramBotClient botClient, Message message, CancellationToken cancellationToken)
+        public static async Task HandleMessageAsync(ITelegramBotClient botClient, Message message, CancellationToken cancellationToken)
         {
             switch (message.Text)
             {
@@ -87,14 +89,10 @@ namespace CrmApiTelegramBot.BotLogic.Classes
                 default:
                     await SendMessage(botClient, message.Chat, "Дарова ебать!");
                     return;
-                
-            }
-            if (message != null)
-            {
             }
         }
 
-        public async Task HandleUpdateAsync(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)
+        private static async Task HandleUpdateAsync(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)
         {
 
             var handler = update switch
@@ -107,26 +105,26 @@ namespace CrmApiTelegramBot.BotLogic.Classes
 
         }
 
-        public static async Task HandleErrorAsync(ITelegramBotClient botClient, Exception exception, CancellationToken cancellationToken)
+        private static async Task HandleErrorAsync(ITelegramBotClient botClient, Exception exception, CancellationToken cancellationToken)
         {
 
             Console.WriteLine(Newtonsoft.Json.JsonConvert.SerializeObject(exception));
         }
 
 
-        private static string ReadApiToken(IConfiguration appconfig)
+        private static string ReadApiToken(IConfiguration config)
         {
-            string token = appconfig["token"];
+            string token = config["token"];
             if (token != null)
             {
-                logger.LogInformation("Token read success!");
+                //_logger.LogInformation("Token read success!");
                 return token;
             }
-            logger.LogInformation("Token don't read!!!");
+            //_logger.LogInformation("Token don't read!!!");
             return null;
         }
 
-        public void TelegramBotDisable()
+        private static void TelegramBotDisable()
         {
             if (botClient != null)
             {
@@ -134,10 +132,10 @@ namespace CrmApiTelegramBot.BotLogic.Classes
             }
         }
 
-        public async Task<List<Trips>> GetMyTrips(long telegramId)
+        private static async Task<List<Trips>> GetMyTrips(long telegramId)
         {
-            //var httpClient = _httpClientFactory.CreateClient("GetMyTrips");
-            var httpClient = new HttpClient();
+            var httpClient = _httpClientFactory.CreateClient("GetMyTrips");
+            //var httpClient = new HttpClient();
             var response = await httpClient.GetAsync("http://localhost:5000/getmytrips/" + telegramId);
             if (response.IsSuccessStatusCode)
             {
@@ -146,6 +144,24 @@ namespace CrmApiTelegramBot.BotLogic.Classes
                 return trips;
             }
             return null;
+        }
+
+        /// <summary>
+        /// Отправка сообщений о новой командировке
+        /// </summary>
+        /// <param name="trip">Полученные сведения о команировке и чате в который нужно отправить</param>
+        public static async Task<HttpStatusCode> SendMessageOfNewTrip(SentTrip trip)
+        {
+            Chat chat = new Chat()
+            {
+                Id = trip.telegramId
+            };
+            await SendMessage(botClient, chat, $"Менеджер: {trip.managerName}" +
+                                                $"\nОт кого едем: {trip.company}" +
+                                                $"\nДата выезда: {trip.dateOfTrip}" +
+                                                $"\nЗаказчик: {trip.customer}" +
+                                                $"\nАдрес заказчика: {trip.address} ");
+            return HttpStatusCode.OK;
         }
     }
 }

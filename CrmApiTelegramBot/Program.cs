@@ -1,5 +1,5 @@
 using CrmApiTelegramBot.BotLogic.Classes;
-using CrmApiTelegramBot.BotLogic.Interfaces;
+using CrmApiTelegramBot.Model;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography.X509Certificates;
 using Telegram.Bot;
@@ -8,10 +8,8 @@ namespace CrmApiTelegramBot
 {
     public class Program
     {
-        public static readonly ILoggerFactory logFactory =  LoggerFactory.Create(conf => conf.AddConsole());
-        private static IHttpClientFactory _httpClientFactory;
+        //public static readonly ILoggerFactory logFactory =  LoggerFactory.Create(conf => conf.AddConsole());
 
-        public Program(IHttpClientFactory httpClientFactory) => _httpClientFactory = httpClientFactory;
         public static void Main(string[] args)
         {
 
@@ -20,13 +18,18 @@ namespace CrmApiTelegramBot
             // Add services to the container.
             builder.Services.AddAuthorization();
             builder.Configuration.AddJsonFile("token.json");
-            IStartBot botClient = new StartBot(builder.Configuration);
-            botClient.StartBot();
 
             // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen();
+            builder.Services.AddLogging(conf => conf.AddConsole()
+                                                    .SetMinimumLevel(LogLevel.Information));
+            //builder.Logging.AddConsole()
+            //               .SetMinimumLevel(LogLevel.Information);
+
             builder.Services.AddHttpClient();
+            builder.Services.AddTransient<StartBot>();
+
 
             var app = builder.Build();
 
@@ -41,18 +44,16 @@ namespace CrmApiTelegramBot
 
             app.UseAuthorization();
 
-            app.MapGet("/sendtrip", () =>
+            //IStartBot botClient = new StartBot();
+            //var token = botClient.ReadApiToken(builder.Configuration);
+            app.MapPost("/sendtrip", async (SentTrip trip) =>
             {
-
+               var httpCode =  await StartBot.SendMessageOfNewTrip(trip);
             });
-            //TestHttpCLientFactory();
+
+            StartBot.startBot(builder.Configuration);
             app.Run();
-
-        }
-
-        private static  void TestHttpCLientFactory()
-        {
-            var httpClient = _httpClientFactory.CreateClient("Test");
+           
         }
     }
 }
