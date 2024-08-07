@@ -1,4 +1,7 @@
+using Microsoft.Extensions.DependencyInjection;
+using CrmApiTelegramBot.BotLogic;
 using CrmApiTelegramBot.BotLogic.Classes;
+using CrmApiTelegramBot.BotLogic.Interfaces;
 using CrmApiTelegramBot.Model;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography.X509Certificates;
@@ -9,11 +12,17 @@ namespace CrmApiTelegramBot
     public class Program
     {
         //public static readonly ILoggerFactory logFactory =  LoggerFactory.Create(conf => conf.AddConsole());
+        static ITelegramBotLogic _telegramBot;
+
+        public Program (ITelegramBotLogic teltegramBot)
+        {
+            _telegramBot = teltegramBot;
+        }
 
         public static void Main(string[] args)
         {
+            ITelegramBotLogic telegramBot = new TelegramBotLogic();
 
-            
             var builder = WebApplication.CreateBuilder(args);
             // Add services to the container.
             builder.Services.AddAuthorization();
@@ -22,18 +31,20 @@ namespace CrmApiTelegramBot
             // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen();
-            builder.Services.AddLogging(conf => conf.AddConsole()
-                                                    .SetMinimumLevel(LogLevel.Information));
+            //builder.Services.AddLogging(conf => conf.AddConsole()
+            //                                        .SetMinimumLevel(LogLevel.Information));
             //builder.Logging.AddConsole()
             //               .SetMinimumLevel(LogLevel.Information);
 
             builder.Services.AddHttpClient();
-            builder.Services.AddTransient<StartBot>();
+            builder.Services.AddSingleton<ITelegramBotLogic, TelegramBotLogic>();
+            builder.Services.AddSingleton<Program>();
 
-
+            telegramBot.StartBot(builder.Configuration);
             var app = builder.Build();
 
-            // Configure the HTTP request pipeline.
+
+            //Configure the HTTP request pipeline.
             if (app.Environment.IsDevelopment())
             {
                 app.UseSwagger();
@@ -44,14 +55,11 @@ namespace CrmApiTelegramBot
 
             app.UseAuthorization();
 
-            //IStartBot botClient = new StartBot();
-            //var token = botClient.ReadApiToken(builder.Configuration);
             app.MapPost("/sendtrip", async (SentTrip trip) =>
             {
-               var httpCode =  await StartBot.SendMessageOfNewTrip(trip);
+                var httpCode = await telegramBot.SendMessageOfNewTrip(trip);
             });
 
-            StartBot.startBot(builder.Configuration);
             app.Run();
            
         }

@@ -1,5 +1,7 @@
 ﻿
+using CrmApiTelegramBot.BotLogic.Interfaces;
 using CrmApiTelegramBot.Model;
+using Google.Apis.Sheets.v4.Data;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using System.Net;
@@ -14,7 +16,7 @@ using Telegram.Bot.Types.ReplyMarkups;
 
 namespace CrmApiTelegramBot.BotLogic.Classes
 {
-    public class StartBot
+    public class TelegramBotLogic : ITelegramBotLogic
     {
         private static readonly CancellationTokenSource cts = new CancellationTokenSource();
         private static ITelegramBotClient botClient;
@@ -23,14 +25,14 @@ namespace CrmApiTelegramBot.BotLogic.Classes
         //private static ILoggerFactory _loggerFactory { get; set; }
         private static ILogger _logger;
 
-        public StartBot(IHttpClientFactory httpClientFactory, ILogger<StartBot> logger)
-        {
-            _httpClientFactory = httpClientFactory;
-            _logger = logger ;
-        }
+        //public TelegramBotLogic(IHttpClientFactory httpClientFactory, ILogger<TelegramBotLogic> logger)
+        //{
+        //    _httpClientFactory = httpClientFactory;
+        //    _logger = logger ;
+        //}
 
 
-        public static async void startBot(IConfiguration config)
+        public async void StartBot(IConfiguration config)
         {
             //ILogger logger = _loggerFactory.CreateLogger("StartBot");
             var token = ReadApiToken(config);
@@ -39,21 +41,27 @@ namespace CrmApiTelegramBot.BotLogic.Classes
             var reciveOpt = new ReceiverOptions()
             {
                 AllowedUpdates = Array.Empty<UpdateType>(),
-                ThrowPendingUpdates = true 
             };
             var bot = await botClient.GetMeAsync(cancelationToken);
-            //_logger.LogInformation("Start receiving updates for {BotName}", bot.Username ?? "Integration Trip Bot");
+
             await botClient.ReceiveAsync(HandleUpdateAsync, HandleErrorAsync, reciveOpt, cancelationToken);
+
         }
 
         public static async Task SendMessage(ITelegramBotClient client, Chat chat, string message, ParseMode parseMode = ParseMode.Html)
         {
+            //var buttons = new InlineKeyboardButton("Один");
+            var inlineKeyboard = new InlineKeyboardMarkup()
+                .AddButton("1.1", "2.2");
+
             try
             {
+
                 await client.SendTextMessageAsync(
                     chatId: chat,
                     text: message,
                     parseMode: parseMode
+                    //replyMarkup: new ReplyKeyboardRemove()
                 );
             }
             catch (Exception e)
@@ -62,13 +70,39 @@ namespace CrmApiTelegramBot.BotLogic.Classes
             }
         }
 
-        private static async Task HandleUnknownAsync(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)
+        public static async Task SendMessageWithKeyboard(ITelegramBotClient client, Chat chat, string message, ParseMode parseMode = ParseMode.Html)
         {
-            //await SendMessage($"Telegram UpdateType \"{update.Type.ToString()}\" not handled", ParseMode.Html, cancellationToken);
+            var inlineKeyboard = new InlineKeyboardMarkup()
+                .AddButton("Закончил командировку и отправил документы", "writeConsole");
+            try
+            {
+                await client.SendTextMessageAsync(
+                    chatId: chat,
+                    text: message,
+                    parseMode: parseMode,
+                    replyMarkup: inlineKeyboard
+                );
+            }
+            catch (Exception e)
+            {
+                
+            }
         }
 
-        public static async Task HandleMessageAsync(ITelegramBotClient botClient, Message message, CancellationToken cancellationToken)
+
+        private static async Task HandleUnknownAsync(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)
         {
+            if (update.CallbackQuery.Data == "writeConsole")
+            {
+                //await Console.Out.WriteLineAsync("it's Work Morthy!");
+
+                await botClient.AnswerCallbackQueryAsync(update.CallbackQuery.Id, null);
+            }
+        }
+
+        public async Task HandleMessageAsync(ITelegramBotClient botClient, Message message, CancellationToken cancellationToken)
+        {
+
             switch (message.Text)
             {
                 case ("/trips"):
@@ -76,25 +110,26 @@ namespace CrmApiTelegramBot.BotLogic.Classes
                     List<string> messages = new List<string>();
                     foreach (var e in trips)
                     {
-                            await SendMessage(botClient, message.Chat,  $"Менеджер: {e.managerName}" +
+                            await SendMessage(botClient, message.Chat,  $"Вам назначена коммандировка." +
+                                                                        $"\nМенеджер: {e.managerName}" +
                                                                         $"\nОт кого едем: {e.company}" +
                                                                         $"\nДата выезда: {e.dateOfTrip}" +
                                                                         $"\nЗаказчик: {e.customer}" +
-                                                                        $"\nАдрес заказчика: {e.address} ");
+                                                                        $"\nАдрес заказчика: {e.address}" +
+                                                                        $"\nПримечание: {e.caption}");
                     }
                     return;
                 case ("/myId"):
                     await SendMessage(botClient, message.Chat, $"{message.Chat.Id}");
                     return;
                 default:
-                    await SendMessage(botClient, message.Chat, "Дарова ебать!");
+                    await SendMessageWithKeyboard(botClient, message.Chat, $"Сам ты - {message.Text}") ;
                     return;
             }
         }
 
-        private static async Task HandleUpdateAsync(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)
+        private async Task HandleUpdateAsync(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)
         {
-
             var handler = update switch
             {
                 { Message: { } message } => HandleMessageAsync(botClient, message, cancellationToken),
@@ -107,7 +142,6 @@ namespace CrmApiTelegramBot.BotLogic.Classes
 
         private static async Task HandleErrorAsync(ITelegramBotClient botClient, Exception exception, CancellationToken cancellationToken)
         {
-
             Console.WriteLine(Newtonsoft.Json.JsonConvert.SerializeObject(exception));
         }
 
@@ -132,10 +166,10 @@ namespace CrmApiTelegramBot.BotLogic.Classes
             }
         }
 
-        private static async Task<List<Trips>> GetMyTrips(long telegramId)
+        public async Task<List<Trips>> GetMyTrips(long telegramId)
         {
-            var httpClient = _httpClientFactory.CreateClient("GetMyTrips");
-            //var httpClient = new HttpClient();
+            //var httpClient = _httpClientFactory.CreateClient("GetMyTrips");
+            var httpClient = new HttpClient();
             var response = await httpClient.GetAsync("http://localhost:5000/getmytrips/" + telegramId);
             if (response.IsSuccessStatusCode)
             {
@@ -150,18 +184,41 @@ namespace CrmApiTelegramBot.BotLogic.Classes
         /// Отправка сообщений о новой командировке
         /// </summary>
         /// <param name="trip">Полученные сведения о команировке и чате в который нужно отправить</param>
-        public static async Task<HttpStatusCode> SendMessageOfNewTrip(SentTrip trip)
+        public async Task<HttpStatusCode> SendMessageOfNewTrip(SentTrip trip)
         {
+            
             Chat chat = new Chat()
             {
                 Id = trip.telegramId
             };
-            await SendMessage(botClient, chat, $"Менеджер: {trip.managerName}" +
-                                                $"\nОт кого едем: {trip.company}" +
-                                                $"\nДата выезда: {trip.dateOfTrip}" +
-                                                $"\nЗаказчик: {trip.customer}" +
-                                                $"\nАдрес заказчика: {trip.address} ");
+            await SendMessageWithKeyboard(botClient, chat, $"Вам назначена коммандировка." +
+                                                            $"\nМенеджер: {trip.managerName}" +
+                                                            $"\nОт кого едем: {trip.company}" +
+                                                            $"\nДата выезда: {trip.dateOfTrip}" +
+                                                            $"\nЗаказчик: {trip.customer}" +
+                                                            $"\nАдрес заказчика: {trip.address}" +
+                                                            $"\nПримечание: {trip.caption}");
             return HttpStatusCode.OK;
         }
+
+        private async Task<HttpStatusCode> fillColorGoogleSheet()
+        {
+            var sheet = new Spreadsheet();
+            return HttpStatusCode.OK;
+        }
+
+        //private static async Task<List<Trips>> GetMyTrips(long telegramId)
+        //{
+        //    var httpClient = _httpClientFactory.CreateClient("GetMyTrips");
+        //    //var httpClient = new HttpClient();
+        //    var response = await httpClient.GetAsync("http://localhost:5000/getmytrips/" + telegramId);
+        //    if (response.IsSuccessStatusCode)
+        //    {
+        //        var jsonresult = await response.Content.ReadAsStringAsync();
+        //        var trips = JsonSerializer.Deserialize<List<Trips>>(jsonresult);
+        //        return trips;
+        //    }
+        //    return null;
+        //}
     }
 }
