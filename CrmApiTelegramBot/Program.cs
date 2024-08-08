@@ -60,6 +60,11 @@ namespace CrmApiTelegramBot
                 var httpCode = await telegramBot.SendMessageOfNewTrip(trip);
             });
 
+            app.MapPost("/tripanswer", async (TripsFormGoogleSheets trip) =>
+            {
+                var httpCode = await telegramBot.SendMessageFromGoogleSheets(trip);
+            });
+
             app.Run();
            
         }

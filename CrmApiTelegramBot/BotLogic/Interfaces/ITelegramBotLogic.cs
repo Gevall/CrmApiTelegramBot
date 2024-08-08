@@ -10,5 +10,7 @@ namespace CrmApiTelegramBot.BotLogic.Interfaces
         public Task<List<Trips>> GetMyTrips(long telegramId);
 
         public Task<HttpStatusCode> SendMessageOfNewTrip(SentTrip trip);
+
+        public Task<HttpStatusCode> SendMessageFromGoogleSheets(TripsFormGoogleSheets trip);
     }
 }
